@@ -1,9 +1,11 @@
 <template>
-    <div id="mine_settings" >
-        <p>Mines: {{mines - numFlagged}}</p>
-
-        <h1 v-if="victory">Victory!</h1>
-        <div id="mine_board" v-bind:class="difficultyClass" v-once>
+    <div id="mine_settings" class="mt-3" >
+        <div class="header text-center">
+            <span class="text-center mr-5">Mines: {{mines - numFlagged}}</span>
+            <span class="text-center">Time: {{time}}</span>
+        </div>
+        <h1 v-if="victory" class="text-center">Victory!</h1>
+        <div id="mine_board" class="mx-auto" :class="difficultyClass" v-once>
             <template v-for="n in rows" >
                 <template v-for="k in cols">
                     <div v-bind:id="(n-1)+'_'+(k-1)"
@@ -20,6 +22,7 @@
 </template>
 
 <script>
+    import {ADD_GOLD, REMOVE_ALL_GOLD} from "@/store-constants";
 
     export default {
         name: "MineBoard",
@@ -37,6 +40,8 @@
                 numFlagged: 0,
                 checked: [],
                 STATES: {MINE: -1, BLANK: 0},
+                time: 0,
+                timeInterval: null,
             }
         },
         created() {
@@ -107,6 +112,18 @@
                     divs[i].className = "square blank";
                 }
                 this.printBoard();
+                this.stopTimer();
+                this.time = 0;
+            },
+            startTimer: function() {
+                if (this.timeInterval === null) {
+                    clearInterval(this.timeInterval);
+                    this.timeInterval = setInterval(() => this.time++, 1000);
+                }
+            },
+            stopTimer: function() {
+                clearInterval(this.timeInterval);
+                this.timeInterval = null;
             },
 
             incrementAdjacentMineCount: function(x, y) {
@@ -146,7 +163,8 @@
             },
             handleSquareClick: function (e) {
                 let square = e.target;
-                console.log("clicked " + square.id);
+                // console.log("clicked " + square.id);
+                this.startTimer();
 
                 let x = parseInt(square.getAttribute("posX"));
                 let y = parseInt(square.getAttribute("posY"));
@@ -170,9 +188,10 @@
                 }
             },
             handleSquareMark: function(e) {
+                this.startTimer();
                 // e.preventDefault();
                 let square = e.target;
-                console.log("toggled mark on " + square.id);
+                // console.log("toggled mark on " + square.id);
 
                 let x = parseInt(square.getAttribute("posX"));
                 let y = parseInt(square.getAttribute("posY"));
@@ -230,11 +249,54 @@
             },
             gameOver: function() {
                 this.revealAllMines();
+                this.stopTimer();
+
+                let numFlags = this.getCorrectlyMarkedFlags();
+
+                this.$store.commit(ADD_GOLD, numFlags);
 
                 // Prevent clicking anything else...
                 for (let y = 0; y < this.rows; y++) {
                     for (let x = 0; x < this.cols; x++) {
                         this.flagged[y][x] = 1;
+                    }
+                }
+            },
+            getCorrectlyMarkedFlags: function() {
+                let count = 0;
+                for (let y = 0; y < this.rows; y++) {
+                    for (let x = 0; x < this.cols; x++) {
+                        // Flagged and is mine
+                        if (this.flagged[y][x] === 1 && this.minePositions[y][x] === this.STATES.MINE) {
+                            count++;
+                        } else if (this.flagged[y][x] === 1 && this.minePositions[y][x] !== this.STATES.MINE) {
+                            count -= 2;
+                        }
+                    }
+                }
+                return Math.max(count, 0); // limit it to 0+
+            },
+            hint: function() {
+                // hint 1 square
+                // find a blank
+                // TODO: randomize hint
+                for (let y = 0; y < this.rows; y++) {
+                    for (let x = 0; x < this.cols; x++) {
+                        if (this.minePositions[y][x] === this.STATES.BLANK && !this.isRevealed(x,y)) {
+                            let block = this.getBlock(x, y);
+                            block.classList.add("hint");
+                            return;
+                        }
+                    }
+                }
+                // find any block
+                for (let y = 0; y < this.rows; y++) {
+                    for (let x = 0; x < this.cols; x++) {
+                        if (this.minePositions[y][x] !== this.STATES.MINE && !this.isRevealed(x,y)) {
+                            let block = this.getBlock(x, y);
+                            block.classList.add("hint");
+                            return;
+                        }
                     }
                 }
             },
@@ -264,13 +326,14 @@
                 squareElement.classList.add(classStr)
             },
             printBoard: function() {
-                for (let y = 0; y < this.rows; y++) {
-                    var str = "";
-                    for (let x = 0; x < this.cols; x++) {
-                        str += " " + this.minePositions[y][x];
-                    }
-                    console.log(str);
-                }
+                return 1;
+                // for (let y = 0; y < this.rows; y++) {
+                //     var str = "";
+                //     for (let x = 0; x < this.cols; x++) {
+                //         str += " " + this.minePositions[y][x];
+                //     }
+                //     console.log(str);
+                // }
             },
             checkVictory: function () {
                 for (let y = 0; y < this.rows; y++) {
@@ -282,8 +345,10 @@
                         }
                     }
                 }
+                this.$store.commit(REMOVE_ALL_GOLD);
                 this.victory = true;
-                console.log("Victory!");
+                this.stopTimer();
+                // console.log("Victory!");
             }
         }
     }
@@ -340,19 +405,21 @@
     .marked-wrong {
         background-position: -96px -78px;
     }
+    .blank.hint {
+        filter: drop-shadow(2px 4px 6px yellow)
+    }
 
     #mine_board.easy {
-        margin-left: 42.2%;
+        margin-left: 20.2%;
         width: 288px;
         height: 300px;
     }
     #mine_board.medium {
-        margin-left: 37.2%;
+        margin-left: 14.2%;
         width: 512px;
         height: 512px;
     }
     #mine_board.expert {
-        margin-left: 25.2%;
         width: 960px;
         height: 276px;
     }
