@@ -20,6 +20,7 @@ export default new Vuex.Store({
     mutations: {
         [REMOVE_ALL_GOLD](state) {
             state.gold = 0;
+            SaveGoldToLocalStorage(state.gold);
         },
         [ADD_GOLD](state, numFlags) {
             state.gold += numFlags;
