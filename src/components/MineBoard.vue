@@ -22,7 +22,7 @@
 </template>
 
 <script>
-    import {ADD_GOLD, REMOVE_ALL_GOLD} from "@/store-constants";
+    import {ADD_GOLD, INCREMENT_DEFEATS, INCREMENT_VICTORIES, REMOVE_ALL_GOLD} from "@/store-constants";
 
     export default {
         name: "MineBoard",
@@ -39,9 +39,10 @@
                 flagged: [],
                 numFlagged: 0,
                 checked: [],
-                STATES: {MINE: -1, BLANK: 0},
+                STATES: {MINE: -1, BLANK: 0, PROTECTED: -2},
                 time: 0,
                 timeInterval: null,
+                isFirstClick: false,
             }
         },
         created() {
@@ -92,12 +93,14 @@
                 let minesLeft = this.mines;
                 for (let i = 0; i < minesLeft; ++i) {
                     let duplicate = false;
+                    let protectedSquare = false;
                     let minePosX, minePosY;
                     do {
                         minePosX = Math.floor(Math.random() * this.cols);
                         minePosY = Math.floor(Math.random() * this.rows);
                         duplicate = this.isMine(minePosX, minePosY);
-                    } while (duplicate);
+                        protectedSquare = this.isProtected(minePosX, minePosY);
+                    } while (duplicate || protectedSquare);
 
                     this.minePositions[minePosY][minePosX] = this.STATES.MINE;
                     this.incrementAdjacentMineCount(minePosX, minePosY);
@@ -106,7 +109,7 @@
             reset: function() {
                 this.victory = false;
                 this.setDefaults();
-                this.createMines();
+                this.isFirstClick = true;
                 var divs = document.getElementsByClassName("square");
                 for (let i = 0; i < divs.length; i++) {
                     divs[i].className = "square blank";
@@ -155,6 +158,9 @@
             isMine: function(x,y) {
                 return this.minePositions[y][x] === this.STATES.MINE;
             },
+            isProtected: function(x, y) {
+                return this.flagged[y][x] === this.STATES.PROTECTED;
+            },
             isflagged: function(x,y) {
                 return this.flagged[y][x] === 1;
             },
@@ -164,17 +170,24 @@
             handleSquareClick: function (e) {
                 let square = e.target;
                 // console.log("clicked " + square.id);
-                this.startTimer();
 
                 let x = parseInt(square.getAttribute("posX"));
                 let y = parseInt(square.getAttribute("posY"));
 
-                this.checked[y][x] = 1;
+                // Check first click of game
+                if (this.isFirstClick) {
+                    this.protectNineBlock(x, y);
+                    this.createMines();
+                    this.startTimer();
+                    this.isFirstClick = false;
+                }
 
                 // Event listeneres aren't removing so this is my solution to stop clicking on flagged items
                 if (this.isflagged(x,y)) {
                     return;
                 }
+
+                this.checked[y][x] = 1;
 
                 if (this.isMine(x,y)) {
                     this.gameOver();
@@ -254,6 +267,7 @@
                 let numFlags = this.getCorrectlyMarkedFlags();
 
                 this.$store.commit(ADD_GOLD, numFlags);
+                this.$store.commit(INCREMENT_DEFEATS);
 
                 // Prevent clicking anything else...
                 for (let y = 0; y < this.rows; y++) {
@@ -346,9 +360,26 @@
                     }
                 }
                 this.$store.commit(REMOVE_ALL_GOLD);
+                this.$store.commit(INCREMENT_VICTORIES);
                 this.victory = true;
                 this.stopTimer();
                 // console.log("Victory!");
+            },
+            protectNineBlock: function (x,y) {
+                this.protectSquare(x,y); // center
+                this.protectSquare(x-1,y-1); // top-left
+                this.protectSquare(x,y-1); // top
+                this.protectSquare(x+1,y-1); // top-right
+                this.protectSquare(x+1,y); // right
+                this.protectSquare(x+1,y+1); // bottom right
+                this.protectSquare(x,y+1); // bottom
+                this.protectSquare(x-1,y+1); // bottom-left
+                this.protectSquare(x-1,y); // left
+            },
+            protectSquare: function(x,y) {
+                if (this.isInBounds(x,y)) {
+                    this.flagged[y][x] = this.STATES.PROTECTED;
+                }
             }
         }
     }

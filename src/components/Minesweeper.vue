@@ -6,7 +6,7 @@
             <b-button-toolbar key-nav aria-label="Actions" class="mx-auto">
                 <b-button-group class="mx-auto">
                     <b-button variant="success" :disabled="!canHint" @click="hint" size="lg" title="prioritizes blanks and then any non-mine">Hint (${{hintPrice}})</b-button>
-                    <b-button variant="primary" class="ml-5" @click="reset" size="lg">Reset</b-button>
+                    <b-button variant="primary" class="ml-5" @click="clickReset" size="lg">Reset</b-button>
                 </b-button-group>
 
                 <b-button-group class="mx-auto">
@@ -47,7 +47,7 @@
 
 <script>
     import MineBoard from "@/components/MineBoard";
-    import {GET_GOLD, HAS_ENOUGH_GOLD, SPEND_GOLD} from "@/store-constants";
+    import {GET_GOLD, HAS_ENOUGH_GOLD, INCREMENT_DEFEATS, INCREMENT_HINTS, SPEND_GOLD} from "@/store-constants";
 
     const EASY_SETTINGS = {rows: 9, cols: 9, mines: 10, difficultyClass: "easy"};
     const MEDIUM_SETTINGS = {rows: 16, cols: 16, mines: 40, difficultyClass: "medium"};
@@ -75,6 +75,10 @@
             this.$refs.board.reset();
         },
         methods: {
+            clickReset: function() {
+                this.$store.commit(INCREMENT_DEFEATS);
+                this.reset();
+            },
             reset: function() {
                 this.$refs.board.reset();
             },
@@ -89,6 +93,7 @@
                 if (this.$store.getters[HAS_ENOUGH_GOLD], this.hintPrice) {
                     this.$store.commit(SPEND_GOLD, this.hintPrice);
                     this.$refs.board.hint();
+                    this.$store.commit(INCREMENT_HINTS);
                 }
             }
         }
